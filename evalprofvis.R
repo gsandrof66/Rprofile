@@ -3,13 +3,16 @@ library(glue)
 library(data.table)
 library(dtplyr)
 library(dplyr)
-# getDTthreads()
 setDTthreads(4L)
 library(readr)
 
 FILE <- "datareview.csv"
 EXCEL <- "Base.xlsx"
 DIR <- "RESULT/"
+
+word <- "good"
+n <- 2000
+
 readr_funct <- function(dir, word, s){
   data <- read_csv(dir)
   print(class(data))
@@ -51,8 +54,6 @@ save_datawb1 <- function(d1,d2,d3, PATH, FILE){
 
 profvis(
   {
-    word <- "good"
-    n <- 2000
     d1 <- readr_funct(FILE, word, n)
     d2 <- base_funct(FILE, word, n)
     d3 <- datatable_funct(FILE, word, n)
@@ -60,8 +61,16 @@ profvis(
     save_datawb1(d1, d2, d3, DIR, EXCEL)
   },interval = 0.01
 )
+
 rm(d1,d2,d3)
 gc()
+
 # default 0.01
-# waiting list 0.1 very long
+# I used waiting list 0.1 sec interval since it is very long
 # short code (lowest value) 0.005
+
+
+
+
+
+

@@ -50,6 +50,7 @@ rsconnect/
 
 # Content from the RESULT folder
 RESULT/*
+myrev/*
 
 # Heavy file more than 1GB
 datareview.csv

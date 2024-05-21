@@ -1,0 +1,348 @@
+---
+title: "R performance"
+author: "Gatz F"
+date: "22/05/2024"
+output: html_document
+---
+# **Performance**
+
+Ref: https://www.datacamp.com/tutorial/five-tips-r-code-improve
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+library("microbenchmark")
+library(glue)
+library(ggplot2)
+library(dplyr)
+library(ggdark)
+options(repr.plot.width=18, repr.plot.height=7)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# function to calculate reduction
+calcpecentage <- function(micro){
+  v <- aggregate(time ~ expr, micro, mean)
+  i <- 1
+  j <- 2
+  if(v$time[i] < v$time[j]){
+    i <- 2
+    j <- 1
+  }
+  reduction <- ((v$time[i] - v$time[j])*100)/v$time[i]
+  reduction <- reduction |> round(digits = 2)
+  return(glue("{reduction} % reduction using {v$expr[j]}"))
+}
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+start_date <- "2017-01-01"
+end_date <- "2019-12-31"
+f1<-function(d2, d1){
+  n_weeks <-  floor(as.numeric(difftime(d2, d1, units="weeks")))
+  # print(glue("Result 1: {n_weeks_in_scaling_period}"))
+}
+f2<-function(d2, d1){
+  n_weeks <- floor(as.numeric(difftime(as.Date(d2), as.Date(d1), units = "weeks")))
+  # print(glue("Result 2: {n_weeks_in_scaling_period}"))
+}
+m1<-microbenchmark(
+  Nocasting = f1(end_date, start_date),
+  Casting = f2(end_date, start_date),
+  times = 800
+)
+print(m1)
+```
+
+```{r, message=FALSE, warning=FALSE}
+m1 |> boxplot(horizontal = TRUE, main = 'Time comparison casting dates',
+     ylab = glue('Time {calcpecentage(m1)}'), xlab = 'Type function',
+     cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2)
+# + ggdark::dark_mode()
+```
+```{r}
+# m1$time
+ggplot(data = m1, aes(x = time, y = expr)) +
+  geom_boxplot() +
+  # geom_line() +
+  labs(y = "Function", x = "Execution Time (ms)",
+       title = "Microbenchmark Results: Execution Time by Function") + ggdark::dark_mode()
+```
+# Base code vs dplyr
+
+```{r, message=FALSE, warning=FALSE}
+# Example data frame with points scored by players
+set.seed(1)
+mydemo <- data.frame(
+  team = rep(c('A', 'B'), each = 4000),
+  points =sample(1:100, 8000, replace = TRUE)
+)
+print(head(mydemo))
+```
+
+
+```{r}
+base_r_time <- function(mydemo){
+  x <- aggregate(mydemo$points, list(mydemo$team), FUN = mean)
+  # print(x)
+}
+dplyr_time <- function(mydemo){
+  x <- mydemo %>% group_by(team) %>% summarise_at(vars(points), list(name = mean))
+  # print(x)
+}
+m2 <- microbenchmark(
+  base = base_r_time(mydemo),
+  dplyr = dplyr_time(mydemo),
+  times = 30
+)
+print(m2)
+```
+
+```{r}
+m2 |>
+boxplot(horizontal = TRUE, main = 'Time comparison base v dplyr',
+     ylab = glue('Time {calcpecentage(m2)}'), xlab = 'Type function',
+     cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
+```
+# Next time you create an empty vector with c(), try to replace it with vector("type", length)
+
+```{r}
+x <- vector("numeric", 5)
+print(x)
+```
+
+```{r}
+f1 <- function (n){
+  x <- c()
+  for (i in seq(n)) {
+    x <- c(x, i)
+  }
+  # print(x)
+}
+f2 <- function (n){
+  x <- vector("integer", n)
+  for (i in seq(n)) {
+    x[i] <- i
+  }
+  # print(x)
+}
+m3 <- microbenchmark(
+  nosize = f1(1e5),
+  size = f2(1e5),
+  times = 5
+)
+print(m3)
+```
+
+```{r, message=FALSE, warning=FALSE}
+m3 |>
+boxplot(horizontal = TRUE, main = 'Time comparison vector size v no size',
+     ylab = glue('Time {calcpecentage(m3)}'), xlab = 'Type function',
+     cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
+```
+# Column first
+
+When you specify column first, this means that you're now referring to a vector
+```{r, message=FALSE, warning=FALSE}
+n <- 1e4
+dt <- data.frame(
+  a = seq(n),
+  b = runif(n)
+)
+dt
+```
+
+```{r, message=FALSE, warning=FALSE}
+v1 <- function(dt){
+  d <- mean(dt[dt$b > .5, ]$a)
+  # print(d)
+}
+v2 <- function(dt){
+  d <- mean(dt$a[dt$b > .5])
+  # print(d)
+}
+m5 <- microbenchmark(
+  row_operation = v1(dt),
+  column_operation = v2(dt),
+  times = 10
+)
+print(m5)
+```
+
+```{r, message=FALSE, warning=FALSE}
+m5 |>
+boxplot(horizontal = TRUE, main = 'Time comparison column v row',
+     ylab = glue('Time {calcpecentage(m5)}'), xlab = 'Type function',
+     cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+num <- 1e7
+s1 <- function(num){
+  d <- 1
+  for(i in 1:num){
+    d <- d * i
+  }
+  return(d)
+}
+s2 <- function(num){
+  d <- 1
+  for(i in seq(num)){
+    d <- d * i
+  }
+  return(d)
+}
+m6<-microbenchmark(
+  noseq = s1(num),
+  seq = s2(num),
+  times = 20
+)
+print(m6)
+```
+
+```{r, message=FALSE, warning=FALSE}
+m6 |>
+boxplot(horizontal = TRUE, main = 'Time comparison seq v no seq',
+     ylab = glue('Time {calcpecentage(m6)}'), xlab = 'Type function',
+     cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
+```
+# New pipe
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(123)
+demo <- data.frame(
+  x = rnorm(10^6),
+  y = rnorm(10^6),
+  z = rnorm(10^6)
+)
+# Microbenchmarking native pipe vs dplyr pipe
+m7 <- microbenchmark(
+  native_pipe = {
+    demo |>
+      filter(x > 0) |>
+      mutate(new_col = y * 2) |>
+      summarise(avg_z = mean(z))
+  },
+  dplyr_pipe = {
+    demo %>%
+      filter(x > 0) %>%
+      mutate(new_col = y * 2) %>%
+      summarise(avg_z = mean(z))
+  },
+  times = 100
+)
+print(m7)
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+m7 |>
+boxplot(horizontal = TRUE, main = 'Time comparison new v old pipe',
+     ylab = glue('Time {calcpecentage(m7)}'), xlab = 'Type function',
+     cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+library(data.table)
+library(dtplyr)
+library(arrow)
+library(readr)
+setDTthreads(4L)
+
+df <- read_parquet("myrev/rev.parquet") |>
+  filter(!is.na(rating) & !is.na(date_added))
+
+df |> select(date_added, rating)
+```
+```{r, message=FALSE, warning=FALSE}
+datatable <- function(df){
+  df[, date_updated := as.POSIXct(date_updated, format = "%a %b %d %H:%M:%S %z %Y", tz = "UTC")]
+  return(df)
+}
+dply <- function(df){
+  df <- df |> mutate(date_added = as.POSIXct(date_added, format = "%a %b %d %H:%M:%S %z %Y", tz = "UTC"))
+  return(df)
+}
+dtplyr <- function(df){
+  df <- df |>
+    lazy_dt() |>
+    mutate(date_added = as.POSIXct(date_added, format = "%a %b %d %H:%M:%S %z %Y", tz = "UTC")) |>
+    as.data.table()
+  return(df)
+}
+m8<-microbenchmark(
+  datatable = datatable(df),
+  dply = dply(df),
+  dtplyr = dtplyr(df),
+  times = 10
+)
+print(m8)
+```
+
+```{r, message=FALSE, warning=FALSE}
+m8 |>
+boxplot(horizontal = TRUE, main = 'Time comparison',
+     ylab = 'Time', xlab = 'Type function',
+     cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
+```
+
+```{r, message=FALSE, warning=FALSE}
+snappy <- function(dt){
+  write_dataset(dt,
+                glue("{format(Sys.time(), '%Y%m%d_%H%M%S_')}snappy_data"),
+                format = "parquet", compression="snappy")
+}
+gzip <- function(dt){
+  write_dataset(dt,
+                glue("{format(Sys.time(), '%Y%m%d_%H%M%S_')}gzip_data"),
+                format = "parquet", compression="gzip")
+}
+uncomp <- function(dt){
+  write_dataset(dt,
+                glue("{format(Sys.time(), '%Y%m%d_%H%M%S_')}unc_data"),
+                format = "parquet", compression="uncompressed")
+}
+rdsfile <- function(dt){
+  saveRDS(dt, 
+          glue("{format(Sys.time(), '%Y%m%d_%H%M%S_')}rds_data.rds"))
+}
+mycsv <- function(dt){
+  write_csv(dt, 
+            glue("{format(Sys.time(), '%Y%m%d_%H%M%S_')}csv_data.csv"))
+}
+```
+
+```{r, message=FALSE, warning=FALSE}
+m9<-microbenchmark(
+  fsnappy = snappy(df),
+  fgzip = gzip(df),
+  funcomp = uncomp(df),
+  frdsfile = rdsfile(df),
+  fmycsv = mycsv(df),
+  times = 6
+)
+print(m9)
+```
+
+```{r, message=FALSE, warning=FALSE}
+m9 |>
+boxplot(horizontal = TRUE, main = 'Time comparison',
+     ylab = 'Time', xlab = 'Type function',
+     cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+
+```
+
+
+
+

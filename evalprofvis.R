@@ -1,18 +1,22 @@
-library(profvis)
+# library(profvis)
 library(glue)
 library(data.table)
 library(dtplyr)
 library(dplyr)
-setDTthreads(4L)
+library(microbenchmark)
 library(readr)
+library(lubridate)
+library(arrow)
+library(microbenchmark)
+setDTthreads(4L)
 
-FILE <- "datareview.csv"
+file1 <- "datareview.csv"
 EXCEL <- "Base.xlsx"
 DIR <- "RESULT/"
 
-word <- "good"
-n <- 2000
-
+d1 <- file1 %>% read_csv() %>% 
+  filter(!is.na(rating) & !is.na(date_added)) %>% 
+  
 readr_funct <- function(dir, word, s){
   data <- read_csv(dir)
   print(class(data))

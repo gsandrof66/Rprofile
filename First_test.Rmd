@@ -4,9 +4,11 @@ author: "Gatz F"
 date: "22/05/2024"
 output: html_document
 ---
+
 # **Performance**
 
-Ref: https://www.datacamp.com/tutorial/five-tips-r-code-improve
+Ref: <https://www.datacamp.com/tutorial/five-tips-r-code-improve>
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -36,7 +38,6 @@ calcpecentage <- function(micro){
 }
 ```
 
-
 ```{r, message=FALSE, warning=FALSE}
 start_date <- "2017-01-01"
 end_date <- "2019-12-31"
@@ -62,14 +63,16 @@ m1 |> boxplot(horizontal = TRUE, main = 'Time comparison casting dates',
      cex.main = 1.2, cex.lab = 1.2, cex.axis = 1.2)
 # + ggdark::dark_mode()
 ```
+
 ```{r}
 # m1$time
 ggplot(data = m1, aes(x = time, y = expr)) +
   geom_boxplot() +
   # geom_line() +
-  labs(y = "Function", x = "Execution Time (ms)",
-       title = "Microbenchmark Results: Execution Time by Function") + ggdark::dark_mode()
+  labs(x = glue('Time {calcpecentage(m1)}'), y = "Function", 
+       title = "Microbenchmark Results: Execution Time by Function") + scale_x_log10() + ggdark::dark_mode()
 ```
+
 # Base code vs dplyr
 
 ```{r, message=FALSE, warning=FALSE}
@@ -81,7 +84,6 @@ mydemo <- data.frame(
 )
 print(head(mydemo))
 ```
-
 
 ```{r}
 base_r_time <- function(mydemo){
@@ -106,6 +108,7 @@ boxplot(horizontal = TRUE, main = 'Time comparison base v dplyr',
      ylab = glue('Time {calcpecentage(m2)}'), xlab = 'Type function',
      cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
 ```
+
 # Next time you create an empty vector with c(), try to replace it with vector("type", length)
 
 ```{r}
@@ -142,16 +145,18 @@ boxplot(horizontal = TRUE, main = 'Time comparison vector size v no size',
      ylab = glue('Time {calcpecentage(m3)}'), xlab = 'Type function',
      cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
 ```
+
 # Column first
 
 When you specify column first, this means that you're now referring to a vector
+
 ```{r, message=FALSE, warning=FALSE}
 n <- 1e4
 dt <- data.frame(
   a = seq(n),
   b = runif(n)
 )
-dt
+head(dt)
 ```
 
 ```{r, message=FALSE, warning=FALSE}
@@ -177,7 +182,6 @@ boxplot(horizontal = TRUE, main = 'Time comparison column v row',
      ylab = glue('Time {calcpecentage(m5)}'), xlab = 'Type function',
      cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
 ```
-
 
 ```{r, message=FALSE, warning=FALSE}
 num <- 1e7
@@ -209,6 +213,7 @@ boxplot(horizontal = TRUE, main = 'Time comparison seq v no seq',
      ylab = glue('Time {calcpecentage(m6)}'), xlab = 'Type function',
      cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
 ```
+
 # New pipe
 
 ```{r, message=FALSE, warning=FALSE}
@@ -237,14 +242,12 @@ m7 <- microbenchmark(
 print(m7)
 ```
 
-
 ```{r, message=FALSE, warning=FALSE}
 m7 |>
 boxplot(horizontal = TRUE, main = 'Time comparison new v old pipe',
      ylab = glue('Time {calcpecentage(m7)}'), xlab = 'Type function',
      cex.main = 1.3, cex.lab = 1.3, cex.axis = 1.3)
 ```
-
 
 ```{r, message=FALSE, warning=FALSE}
 library(data.table)
@@ -253,32 +256,38 @@ library(arrow)
 library(readr)
 setDTthreads(4L)
 
-df <- read_parquet("myrev/rev.parquet") |>
+df1 <- read_csv("datareview.csv") |> 
   filter(!is.na(rating) & !is.na(date_added))
 
-df |> select(date_added, rating)
+df2 <- fread("datareview.csv")|> 
+  filter(!is.na(rating) & !is.na(date_added))
+
+print(class(df1))
+print(class(df2))
+print(head(df1 |> select(date_added, rating)))
 ```
+
 ```{r, message=FALSE, warning=FALSE}
 datatable <- function(df){
-  df[, date_updated := as.POSIXct(date_updated, format = "%a %b %d %H:%M:%S %z %Y", tz = "UTC")]
-  return(df)
+  dx <- df[, date_added := as.POSIXct(date_added, format = "%a %b %d %H:%M:%S %z %Y", tz = "UTC")]
+  return(dx)
 }
-dply <- function(df){
-  df <- df |> mutate(date_added = as.POSIXct(date_added, format = "%a %b %d %H:%M:%S %z %Y", tz = "UTC"))
-  return(df)
+dplyr <- function(df){
+  dx <- df |> mutate(date_added = as.POSIXct(date_added, format = "%a %b %d %H:%M:%S %z %Y", tz = "UTC"))
+  return(dx)
 }
 dtplyr <- function(df){
-  df <- df |>
+  dx <- df |>
     lazy_dt() |>
     mutate(date_added = as.POSIXct(date_added, format = "%a %b %d %H:%M:%S %z %Y", tz = "UTC")) |>
     as.data.table()
-  return(df)
+  return(dx)
 }
 m8<-microbenchmark(
-  datatable = datatable(df),
-  dply = dply(df),
-  dtplyr = dtplyr(df),
-  times = 10
+  datatable = datatable(df2),
+  dplyr = dplyr(df1),
+  dtplyr = dtplyr(df1),
+  times = 20
 )
 print(m8)
 ```
@@ -317,13 +326,17 @@ mycsv <- function(dt){
 ```
 
 ```{r, message=FALSE, warning=FALSE}
+n_rows <- nrow(df2)
+sample_size <- round(0.06 * n_rows)  # 6% of total rows
+print(glue("Rows: {n_rows} and we will only use a sample of {sample_size}"))
+sampled_dt <- df1[sample(n_rows, sample_size), ]
 m9<-microbenchmark(
-  fsnappy = snappy(df),
-  fgzip = gzip(df),
-  funcomp = uncomp(df),
-  frdsfile = rdsfile(df),
-  fmycsv = mycsv(df),
-  times = 6
+  funcomp = uncomp(sampled_dt),
+  fsnappy = snappy(sampled_dt),
+  fgzip = gzip(sampled_dt),
+  frdsfile = rdsfile(sampled_dt),
+  fmycsv = mycsv(sampled_dt),
+  times = 8
 )
 print(m9)
 ```
@@ -342,7 +355,3 @@ boxplot(horizontal = TRUE, main = 'Time comparison',
 ```{r, message=FALSE, warning=FALSE}
 
 ```
-
-
-
-
